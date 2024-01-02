@@ -3,46 +3,59 @@ use regex::Regex;
 #[derive(PartialEq, Debug)]
 pub struct GitUrl {
   pub full_git_url: String,
+  pub group: String,
+  pub project: String,
   pub branch: Option<String>,
 }
 
 impl GitUrl {
   pub fn new(url: &str) -> Result<GitUrl, &'static str> {
-    let with_git_suffix_re = Regex::new(r"\.git$").unwrap();
+    let with_git_suffix_re = Regex::new(r"[/:](?P<group>[^/]+)/(?P<project>[^/]+)\.git$").unwrap();
     let with_git_suffix_caps = with_git_suffix_re.captures(&url);
-    if with_git_suffix_caps.is_some() {
+    if let Some(caps) = with_git_suffix_caps {
       return Ok(GitUrl {
         full_git_url: url.to_string(),
+        group: String::from(&caps["group"]),
+        project: String::from(&caps["project"]),
         branch: None,
       })
     }
 
-    let re = Regex::new(r"(?P<repo_url>^https?://[^/]+/[^/]+/[^/]+)/?(?P<rest_path>.*)?").unwrap();
-    let caps = re.captures(&url).expect("Parse Error. Invalid url.");
+    let http_url_re = Regex::new(r"(?P<repo_url>^https?://[^/]+/(?P<group>[^/]+)/(?P<project>[^/]+))/?(?P<rest_path>.*)?").unwrap();
+    let http_url_caps = http_url_re.captures(&url);
 
-    let repo_url = &caps["repo_url"];
-    let rest_path = &caps["rest_path"];
-    
-    let mut full_git_url = String::from(repo_url);
-    full_git_url.push_str(".git");
+    if let Some(caps) = http_url_caps {
+      let repo_url = &caps["repo_url"];
+      let rest_path = &caps["rest_path"];
+      let group = &caps["group"];
+      let project = &caps["project"];
 
-    if rest_path == "" {
-      return Ok(GitUrl {
-        full_git_url,
-        branch: None,
-      })
-    } else if rest_path.contains("tree/") {
-      let rest_path_str = String::from(rest_path);
-      let pos: Vec<&str> = rest_path_str.split("tree/").collect();
-      let branch = pos[pos.len() - 1].to_string();
-      return Ok(GitUrl {
-        full_git_url,
-        branch: Some(branch),
-      })
+      let mut full_git_url = String::from(repo_url);
+      full_git_url.push_str(".git");
+
+      if rest_path == "" {
+        return Ok(GitUrl {
+          full_git_url,
+          group: String::from(group),
+          project: String::from(project),
+          branch: None,
+        })
+      } else if rest_path.contains("tree/") {
+        let rest_path_str = String::from(rest_path);
+        let pos: Vec<&str> = rest_path_str.split("tree/").collect();
+        let branch = pos[pos.len() - 1].to_string();
+        return Ok(GitUrl {
+          full_git_url,
+          group: String::from(group),
+          project: String::from(project),
+          branch: Some(branch),
+        })
+      } else {
+        return Err("Invalid Url.")
+      }
     } else {
-      return Err("Invalid Url.")
+      return Err("Not support tot parse this url.")
     }
-   
   }
 }
 
@@ -57,6 +70,8 @@ mod tests {
     let expected = GitUrl {
       full_git_url: git_url, 
       branch: None,
+      group: String::from("microsoft"),
+      project: String::from("vscode-docs"),
     };
     assert_eq!(expected, result);
   }
@@ -68,6 +83,8 @@ mod tests {
     let expected = GitUrl {
       full_git_url: git_url, 
       branch: None,
+      group: String::from("microsoft"),
+      project: String::from("vscode-docs"),
     };
     assert_eq!(expected, result);
   }
@@ -82,6 +99,8 @@ mod tests {
     let expected = GitUrl {
       full_git_url,
       branch: None,
+      group: String::from("microsoft"),
+      project: String::from("vscode-docs"),
     };
     assert_eq!(expected, result);
   }
@@ -95,6 +114,8 @@ mod tests {
     let expected = GitUrl {
       full_git_url: String::from("https://github.com/microsoft/vscode-docs.git"),
       branch: Some(String::from("vnext")),
+      group: String::from("microsoft"),
+      project: String::from("vscode-docs"),
     };
 
     assert_eq!(expected, result);

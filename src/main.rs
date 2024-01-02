@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, str, path};
 use console::style;
 
 mod git_url_parser;
@@ -10,21 +10,34 @@ fn main() {
   let git_url = git_url_parser::GitUrl::new(&args[1]).unwrap();
 
   let mut command_args: Vec<String> = vec![
-    "clone".to_owned(),
-    git_url.full_git_url.to_owned(),
+    "clone".to_string(),
+    git_url.full_git_url,
   ];
 
   match git_url.branch {
     Some(branch) => {
-      // TODO: how to remove to_owned()?
-      command_args.push("--branch".to_owned());
-      command_args.push(branch.to_owned());
+      command_args.push(String::from("--branch"));
+      command_args.push(branch);
     }
     None => {},
   }
 
-  println!("{} Start to run: `git {}`", style("INFO").cyan(), command_args.join(" "));
+  println!("{} Start to run command: git {}", style("INFO").cyan(), command_args.join(" "));
 
   let res = utils::run_git(command_args);
-  eprintln!("{} {:?}", style("DONE").green(), res.stderr);
+
+  match res.status.code() {
+    Some(0) => {
+      let path = env::current_dir().unwrap();
+      let repo_path = path::Path::new(&path).join(git_url.project).into_os_string().into_string().unwrap();
+      println!("{} Cloning to `{}` Successfully!", style("DONE").green(), repo_path);
+    },
+    Some(_) => {
+      println!("{} {}", style("ERROR").red(), str::from_utf8(&res.stderr).unwrap());
+      std::process::exit(1);
+    },
+    None => {
+      println!("{} {}", style("ERROR").red(), str::from_utf8(&res.stderr).unwrap());
+    }
+  };
 }
