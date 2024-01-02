@@ -7,7 +7,12 @@ mod utils;
 fn main() {
   let args: Vec<String> = env::args().collect();
 
-  let git_url = git_url_parser::GitUrl::new(&args[1]).unwrap();
+  let git_url = git_url_parser::GitUrl::new(&args[1]).unwrap_or_else(
+    |err| {
+      println!("{} {}", style("ERROR").red(), err);
+      std::process::exit(1);
+    }
+  );
 
   let mut command_args: Vec<String> = vec![
     "clone".to_string(),
