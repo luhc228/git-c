@@ -21,17 +21,17 @@ impl GitUrl {
       })
     }
 
-    let http_url_re = Regex::new(r"(?P<repo_url>^https?://[^/]+/(?P<group>[^/]+)/(?P<project>[^/]+))/?(?P<rest_path>.*)?").unwrap();
+    let http_url_re = Regex::new(r"(?P<repo_url>^https?://(?P<host>[^/]+)/(?P<group>[^/]+)/(?P<project>[^/]+))/?(?P<rest_path>.*)?").unwrap();
     let http_url_caps = http_url_re.captures(&url);
 
     if let Some(caps) = http_url_caps {
-      let repo_url = &caps["repo_url"];
+      let host = &caps["host"];
       let rest_path = &caps["rest_path"];
       let group = &caps["group"];
       let project = &caps["project"];
 
-      let mut full_git_url = String::from(repo_url);
-      full_git_url.push_str(".git");
+      // default use `git@<host>:<group>/<project>.git`` url
+      let full_git_url = format!("git@{}:{}/{}.git", host, group, project);
 
       if rest_path == "" {
         return Ok(GitUrl {
@@ -93,11 +93,9 @@ mod tests {
   fn parse_git_url_without_any() {
     let git_url = String::from("https://github.com/microsoft/vscode-docs");
     let result = GitUrl::new(&git_url).expect("URL parse failed");
-    
-    let mut full_git_url = git_url;
-    full_git_url.push_str(".git");
+
     let expected = GitUrl {
-      full_git_url,
+      full_git_url: String::from("git@github.com:microsoft/vscode-docs.git"),
       branch: None,
       group: String::from("microsoft"),
       project: String::from("vscode-docs"),
@@ -112,7 +110,7 @@ mod tests {
     let result = GitUrl::new(&git_url).expect("URL parse failed");
 
     let expected = GitUrl {
-      full_git_url: String::from("https://github.com/microsoft/vscode-docs.git"),
+      full_git_url: String::from("git@github.com:microsoft/vscode-docs.git"),
       branch: Some(String::from("vnext")),
       group: String::from("microsoft"),
       project: String::from("vscode-docs"),
